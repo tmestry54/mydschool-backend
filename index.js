@@ -53,17 +53,8 @@ const upload = multer({
   }
 });
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || undefined,
-  user: process.env.DATABASE_URL ? undefined : process.env.DB_USER,
-  host: process.env.DATABASE_URL ? undefined : process.env.DB_HOST,
-  database: process.env.DATABASE_URL ? undefined : process.env.DB_DATABASE,
-  password: process.env.DATABASE_URL ? undefined : process.env.DB_PASSWORD,
-  port: process.env.DATABASE_URL ? undefined : process.env.DB_PORT,
-  ssl: process.env.NODE_ENV === 'production' ? {
-    rejectUnauthorized: false
-  } : false,
-  client_encoding: 'UTF8',
-  connectionTimeoutMillis: 5000,
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
 });
 
 app.use(cors({
@@ -77,6 +68,10 @@ app.use((req, res, next) => {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   next();
 });
+app.get('/api/test', (req, res) => {
+  res.json({ message: "Backend connected successfully!" });
+});
+
 if (serviceAccount) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount)
@@ -144,9 +139,6 @@ async function sendBatchFCM(tokens, data) {
 }
 // ========== ROUTES START HERE ==========
 
-app.get('/api/test', (req, res) => {
-  res.json({ message: 'Backend connected successfully!' });
-});
 
 // Login route
 app.post('/api/login', async (req, res) => {
@@ -2268,12 +2260,15 @@ app.post('/api/student/:studentId/fcm-token', async (req, res) => {
 });
 
 // ========== 404 HANDLER (MUST BE LAST) ==========
+
 app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
     message: 'Route not found'
   });
 });
+
+
 console.log('✅ All CRUD routes loaded successfully');
 app.listen(port, '0.0.0.0', () => {
   console.log(`✅ Backend server running on port ${port}`);

@@ -9,33 +9,42 @@ const NodeCache = require('node-cache');
 const AdmZip = require('adm-zip');
 const path = require('path');
 require('dotenv').config();
+
 const cache = new NodeCache({ stdTTL: 300 }); // 5 minutes
+
+// ✅ FIX 1: Firebase setup BEFORE app initialization
 let serviceAccount;
 try {
   if (process.env.FCM_CREDENTIALS) {
-    // For Render deployment
     serviceAccount = JSON.parse(process.env.FCM_CREDENTIALS);
+    console.log('✅ FCM credentials loaded from environment');
   } else {
-    // For local development
     serviceAccount = require('./firebase-service-account.json');
+    console.log('✅ FCM credentials loaded from file');
   }
 } catch (error) {
   console.error('⚠️ Firebase credentials not found:', error.message);
-}const app = express();
+}
+
+const app = express();
+
+// ✅ FIX 2: Port configuration - Render assigns its own port
 const port = process.env.PORT || 3001;
 
-// Configure multer
+// ✅ FIX 3: Configure multer BEFORE routes
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    if (!fs.existsSync('uploads/')) {
-      fs.mkdirSync('uploads/');
+    const uploadDir = 'uploads/';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
     }
-    cb(null, 'uploads/')
+    cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-    cb(null, Date.now() + '-' + file.originalname)
+    cb(null, Date.now() + '-' + file.originalname);
   }
 });
+
 const upload = multer({
   storage: storage,
   fileFilter: (req, file, cb) => {
@@ -52,44 +61,80 @@ const upload = multer({
     }
   }
 });
+
+// ✅ FIX 4: Database pool configuration for Render
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
+  ssl: { 
+    rejectUnauthorized: false 
+  },
 });
 
+// ✅ FIX 5: CORS configuration
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true
 }));
+
+// ✅ FIX 6: Body parser middleware
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// ✅ FIX 7: Static files
 app.use('/uploads', express.static('uploads'));
+
+// ✅ FIX 8: Content-Type header
 app.use((req, res, next) => {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   next();
 });
-app.get('/api/test', (req, res) => {
-  res.json({ message: "Backend connected successfully!" });
+
+// ✅ FIX 9: Test route - MUST BE BEFORE OTHER ROUTES
+app.get('/', (req, res) => {
+  res.json({ 
+    success: true,
+    message: "MyDSchool Backend API is running!",
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      test: '/api/test',
+      login: '/api/login',
+      students: '/api/admin/students'
+    }
+  });
 });
 
-if (serviceAccount) {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
+app.get('/api/test', (req, res) => {
+  console.log('📍 /api/test endpoint hit');
+  res.json({ 
+    success: true,
+    message: "Backend connected successfully!",
+    timestamp: new Date().toISOString()
   });
-  console.log('✅ Firebase Admin initialized');
+});
+
+// ✅ FIX 10: Firebase initialization
+if (serviceAccount) {
+  try {
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+    console.log('✅ Firebase Admin initialized');
+  } catch (error) {
+    console.error('❌ Firebase initialization error:', error.message);
+  }
 } else {
   console.log('⚠️ Firebase Admin not initialized - FCM disabled');
 }
 
+// ✅ FIX 11: Database connection test
 pool.connect((err, client, release) => {
   if (err) {
-    console.error('Error acquiring client', err.stack);
+    console.error('❌ Error acquiring client', err.stack);
   } else {
-    console.log('Database connected successfully');
+    console.log('✅ Database connected successfully');
     release();
   }
 });
-
 // ========== HELPER FUNCTION FOR FCM BATCH SENDING ==========
 async function sendBatchFCM(tokens, data) {
   if (!tokens || tokens.length === 0) {
@@ -2260,16 +2305,26 @@ app.post('/api/student/:studentId/fcm-token', async (req, res) => {
 });
 
 // ========== 404 HANDLER (MUST BE LAST) ==========
-
 app.use('*', (req, res) => {
+  console.log('❌ 404 - Route not found:', req.originalUrl);
   res.status(404).json({
     success: false,
-    message: 'Route not found'
+    message: 'Route not found',
+    path: req.originalUrl
+  });
+});
+app.use((err, req, res, next) => {
+  console.error('❌ Server error:', err.stack);
+  res.status(500).json({
+    success: false,
+    message: 'Internal server error',
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
 });
 
-
-console.log('✅ All CRUD routes loaded successfully');
+// ✅ FIX 14: Server listener - MUST bind to 0.0.0.0 for Render
 app.listen(port, '0.0.0.0', () => {
   console.log(`✅ Backend server running on port ${port}`);
+  console.log(`✅ Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`✅ CORS enabled for: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
 });

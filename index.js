@@ -1,6 +1,6 @@
 import authRoutes from "./routes/authRoutes.js";
-const app = express();
 
+const app = express();
 app.use("/api/auth", authRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 

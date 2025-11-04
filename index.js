@@ -1,4 +1,5 @@
 const express = require('express');
+const app = express();
 const cors = require('cors');
 const { Pool } = require('pg');
 const multer = require('multer');
@@ -9,9 +10,9 @@ const NodeCache = require('node-cache');
 const AdmZip = require('adm-zip');
 const path = require('path');
 require('dotenv').config();
-
-const app = express();
-
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 // Route imports
 const authRoutes = require("./routes/authRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
@@ -63,12 +64,6 @@ const storage = multer.diskStorage({
     cb(null, Date.now() + '-' + file.originalname);
   }
 });
-app.use(cors({
-  origin: ['http://localhost:5173', 'https://mydschool-website.onrender.com'],
-  credentials: true
-}));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 const upload = multer({
   storage: storage,
   fileFilter: (req, file, cb) => {

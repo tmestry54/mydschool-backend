@@ -1,8 +1,8 @@
-import express from "express";
+const express = require("express");
 const router = express.Router();
 
 router.post("/profile", (req, res) => {
   res.json({ success: true, message: "profile successful!" });
 });
 
-export default router;
+module.exports = router;

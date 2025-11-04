@@ -1,3 +1,15 @@
+import authRoutes from "./routes/authRoutes.js";
+const app = express();
+
+app.use("/api/auth", authRoutes);
+app.use("/api/dashboard", dashboardRoutes);
+
+app.use("/api/sections", sectionRoutes);
+app.use("/api/classes", classesRoutes);
+app.use("/api/profile", profileRoutes);
+app.use("/api/assignments", assignmentRoutes);
+app.use("/api/notifications", notificationRoutes);
+
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
@@ -26,7 +38,6 @@ try {
   console.error('⚠️ Firebase credentials not found:', error.message);
 }
 
-const app = express();
 
 // ✅ FIX 2: Port configuration - Render assigns its own port
 const port = process.env.PORT || 3001;
@@ -44,7 +55,9 @@ const storage = multer.diskStorage({
     cb(null, Date.now() + '-' + file.originalname);
   }
 });
-
+app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 const upload = multer({
   storage: storage,
   fileFilter: (req, file, cb) => {
@@ -245,7 +258,6 @@ app.post('/api/login', async (req, res) => {
     });
   }
 });
-
 // ========== SECTIONS API ==========
 app.get('/api/admin/sections', async (req, res) => {
   try {

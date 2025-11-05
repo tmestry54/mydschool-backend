@@ -13,23 +13,7 @@ require('dotenv').config();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-// Route imports
-const authRoutes = require("./routes/authRoutes");
-const dashboardRoutes = require("./routes/dashboardRoutes");
-const sectionRoutes = require("./routes/sectionRoutes");
-const classRoutes = require("./routes/classRoutes");
-const profileRoutes = require("./routes/profileRoutes");
-const assignmentRoutes = require("./routes/assignmentRoutes");
-const notificationRoutes = require("./routes/notificationRoutes");
 
-// Use routes
-app.use("/api/auth", authRoutes);
-app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/sections", sectionRoutes);
-app.use("/api/classes", classRoutes);
-app.use("/api/profile", profileRoutes);
-app.use("/api/assignments", assignmentRoutes);
-app.use("/api/notifications", notificationRoutes);
 
 const cache = new NodeCache({ stdTTL: 300 }); // 5 minutes
 

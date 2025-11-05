@@ -10,11 +10,14 @@ const NodeCache = require('node-cache');
 const AdmZip = require('adm-zip');
 const path = require('path');
 require('dotenv').config();
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  credentials: true
+}));
 
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 const cache = new NodeCache({ stdTTL: 300 }); // 5 minutes
 
 // ✅ FIX 1: Firebase setup BEFORE app initialization
@@ -72,16 +75,6 @@ const pool = new Pool({
     ? { rejectUnauthorized: false }
     : false, // Disable SSL for local
 });
-
-// ✅ FIX 5: CORS configuration
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-  credentials: true
-}));
-
-// ✅ FIX 6: Body parser middleware
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // ✅ FIX 7: Static files
 app.use('/uploads', express.static('uploads'));
@@ -186,9 +179,6 @@ async function sendBatchFCM(tokens, data) {
   return { success: successCount, failed: failedCount };
 }
 // ========== ROUTES START HERE ==========
-
-
-// Login route
 app.post('/api/login', async (req, res) => {
   try {
     console.log('📍 Login request received');

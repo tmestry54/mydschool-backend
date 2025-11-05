@@ -238,6 +238,41 @@ app.post('/api/login', async (req, res) => {
     });
   }
 });
+app.get('/api/setup-admin', async (req, res) => {
+  try {
+    // Check if admin exists
+    const existing = await pool.query(
+      'SELECT * FROM users WHERE username = $1',
+      ['admin']
+    );
+
+    if (existing.rows.length > 0) {
+      return res.json({ 
+        success: true, 
+        message: 'Admin user already exists',
+        user: existing.rows[0]
+      });
+    }
+
+    // Create admin user
+    const result = await pool.query(
+      'INSERT INTO users (username, password, role, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW()) RETURNING *',
+      ['admin', 'admin@123', 'admin']
+    );
+
+    res.json({ 
+      success: true, 
+      message: 'Admin user created',
+      user: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Setup error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+});
 // ========== SECTIONS API ==========
 app.get('/api/admin/sections', async (req, res) => {
   try {

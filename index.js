@@ -1335,102 +1335,52 @@ app.get('/api/student/profile/:userId', async (req, res) => {
   }
 });
 
-app.post('/api/student/profile/:studentId', async (req, res) => {
+// GET student profile with proper validation
+app.get('/api/profile/:studentId', async (req, res) => {
   try {
     const { studentId } = req.params;
+    
+    console.log(`📥 Profile request for student ID: ${studentId}`);
 
-    if (!studentId || isNaN(studentId)) {
-      return res.status(400).json({
+    // Query to get student with proper joins
+    const result = await pool.query(`
+      SELECT 
+        s.*,
+        u.username,
+        u.email as user_email,
+        c.class_name,
+        sec.section_name
+      FROM students s
+      LEFT JOIN users u ON s.user_id = u.id
+      LEFT JOIN classes c ON s.class_id = c.id
+      LEFT JOIN sections sec ON s.section_id = sec.id
+      WHERE s.id = $1
+    `, [studentId]);
+
+    if (result.rows.length === 0) {
+      console.error(`❌ No student found with ID: ${studentId}`);
+      return res.status(404).json({
         success: false,
-        message: 'Invalid student ID',
-        profile: null
+        message: 'Student not found'
       });
     }
 
-    const { address, phone, blood_group, email, parent_phone, parent_email } = req.body;
+    const student = result.rows[0];
+    
+    console.log(`✅ Profile found:
+      - Student ID: ${student.id}
+      - User ID: ${student.user_id}
+      - Username: ${student.username}
+      - Name: ${student.first_name} ${student.last_name}
+    `);
 
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-
-      let studentCheck = await client.query(
-        'SELECT id, user_id FROM students WHERE user_id = $1',
-        [studentId]
-      );
-
-      if (studentCheck.rows.length === 0) {
-        studentCheck = await client.query(
-          'SELECT id, user_id FROM students WHERE id = $1',
-          [studentId]
-        );
-      }
-
-      if (studentCheck.rows.length === 0) {
-        await client.query('ROLLBACK');
-        return res.status(404).json({
-          success: false,
-          message: 'Student profile not found',
-          profile: null
-        });
-      }
-
-      const actualUserId = studentCheck.rows[0].user_id;
-
-      await client.query(`
-        UPDATE students SET 
-          address = $1,
-          phone = $2,
-          blood_group = $3,
-          parent_phone = $4,
-          parent_email = $5,
-          updated_at = NOW()
-        WHERE user_id = $6
-      `, [address || null, phone || null, blood_group || null, parent_phone || null, parent_email || null, actualUserId]);
-
-      if (email) {
-        await client.query(`
-          UPDATE users SET email = $1, updated_at = NOW() WHERE id = $2
-        `, [email, actualUserId]);
-      }
-
-      await client.query('COMMIT');
-
-      const updatedProfile = await client.query(`
-        SELECT 
-          s.*,
-          u.username,
-          u.email,
-          c.class_name,
-          c.id as class_id,
-          sec.section_name
-        FROM students s 
-        JOIN users u ON s.user_id = u.id 
-        LEFT JOIN classes c ON s.class_id = c.id
-        LEFT JOIN sections sec ON c.section_id = sec.id
-        WHERE u.id = $1
-      `, [actualUserId]);
-
-      cache.del(`profile_${studentId}`);
-
-      res.json({
-        success: true,
-        message: 'Profile updated successfully',
-        profile: updatedProfile.rows[0]
-      });
-
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+    res.json(student);
 
   } catch (error) {
-    console.error('Error updating profile:', error);
+    console.error('❌ Profile fetch error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to update profile: ' + error.message,
-      profile: null
+      message: 'Server error'
     });
   }
 });

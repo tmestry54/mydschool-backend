@@ -193,24 +193,21 @@ app.post('/api/login', async (req, res) => {
     }
 
     const result = await pool.query(
-      'SELECT * FROM users WHERE username = $1 AND password = $2',
+      'SELECT id, username, password, role, student_id FROM users WHERE username = $1 AND password = $2',
       [username, password]
     );
 
     if (result.rows.length > 0) {
       const user = result.rows[0];
-      let studentId = null;
       
-      if (user.role === 'student') {
-        const studentResult = await pool.query(
-          'SELECT id FROM students WHERE user_id = $1',
-          [user.id]
-        );
+      // ✅ FIXED: Use student_id directly from users table
+      const studentId = user.student_id;
 
-        if (studentResult.rows.length > 0) {
-          studentId = studentResult.rows[0].id;
-        }
-      }
+      console.log(`✅ Login successful:
+        - User ID: ${user.id}
+        - Username: ${user.username}
+        - Student ID: ${studentId}
+      `);
 
       res.json({
         success: true,
@@ -219,7 +216,7 @@ app.post('/api/login', async (req, res) => {
           id: user.id,
           username: user.username,
           role: user.role,
-          studentId: studentId
+          studentId: studentId  // ✅ This will be correct now
         }
       });
     } else {
@@ -238,6 +235,7 @@ app.post('/api/login', async (req, res) => {
     });
   }
 });
+
 app.get('/api/setup-admin', async (req, res) => {
   try {
     // Check if admin exists
@@ -651,6 +649,12 @@ app.post('/api/admin/students', upload.single('photo'), async (req, res) => {
         phone || null, address || null, date_of_birth || null, blood_group || null,
         parent_name || null, parent_phone || null, parent_email || null, profile_photo
       ]);
+
+      const studentId = studentResult.rows[0].id;
+        await client.query(
+          'UPDATE users SET student_id = $1 WHERE id = $2',
+          [studentId, userId]
+        );
 
       await client.query('COMMIT');
 

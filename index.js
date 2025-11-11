@@ -192,42 +192,73 @@ app.post('/api/login', async (req, res) => {
       });
     }
 
+    // Query user from database
     const result = await pool.query(
       'SELECT id, username, password, role, student_id FROM users WHERE username = $1 AND password = $2',
       [username, password]
     );
 
-    if (result.rows.length > 0) {
-      const user = result.rows[0];
-      
-      // ✅ FIXED: Use student_id directly from users table
-      const studentId = user.student_id;
-
-      console.log(`✅ Login successful:
-        - User ID: ${user.id}
-        - Username: ${user.username}
-        - Student ID: ${studentId}
-      `);
-
-      res.json({
-        success: true,
-        message: 'Login successful',
-        user: {
-          id: user.id,
-          username: user.username,
-          role: user.role,
-          studentId: studentId  // ✅ This will be correct now
-        }
-      });
-    } else {
-      res.status(401).json({
+    if (result.rows.length === 0) {
+      return res.status(401).json({
         success: false,
         message: 'Invalid username or password',
         user: null
       });
     }
+
+    const user = result.rows[0];
+    
+    // ✅ CRITICAL FIX: Always query the students table to get the correct student_id
+    let studentId = null;
+    
+    if (user.role === 'student') {
+      // Query students table using user.id (NOT student_id from users table)
+      const studentResult = await pool.query(
+        'SELECT id FROM students WHERE user_id = $1',
+        [user.id]
+      );
+
+      if (studentResult.rows.length > 0) {
+        studentId = studentResult.rows[0].id;
+        
+        console.log(`✅ Login successful:
+          - User ID: ${user.id}
+          - Username: ${user.username}
+          - Student ID from users table: ${user.student_id}
+          - Student ID from students table: ${studentId}
+        `);
+        
+        // If they don't match, there's a data inconsistency
+        if (user.student_id !== studentId) {
+          console.warn(`⚠️ WARNING: Mismatch detected!
+            - users.student_id = ${user.student_id}
+            - students.id (WHERE user_id=${user.id}) = ${studentId}
+            - Using students table value: ${studentId}
+          `);
+        }
+      } else {
+        console.error(`❌ No student record found for user_id=${user.id}`);
+        return res.status(404).json({
+          success: false,
+          message: 'Student record not found for this user',
+          user: null
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Login successful',
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        studentId: studentId  // ✅ Use the value from students table
+      }
+    });
+
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('❌ Login error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error',
@@ -235,7 +266,6 @@ app.post('/api/login', async (req, res) => {
     });
   }
 });
-
 app.get('/api/setup-admin', async (req, res) => {
   try {
     // Check if admin exists
